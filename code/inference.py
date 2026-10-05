@@ -2,7 +2,8 @@
 from __future__ import annotations
 
 
-def forward_probabilities(model, images, method="I00", space="prob", crop=None, temperature=None):
+def forward_probabilities(model, images, method="I00", space="prob", crop=None, temperature=None,
+                          return_logits=False):
     """Same tensor path for validation, final prediction and latency measurement."""
     import torch
     import torch.nn.functional as F
@@ -27,20 +28,26 @@ def forward_probabilities(model, images, method="I00", space="prob", crop=None, 
         raise ValueError("space must be prob or logit")
     if temperature is not None:
         probs = (probs.clamp_min(1e-12).log() / temperature).softmax(1)
-    return probs
+    return (probs, torch.stack(logits)) if return_logits else probs
 
 
-def predict_method(model, loader, device, method="I00", space="prob", crop=None):
+def predict_method(model, loader, device, method="I00", space="prob", crop=None, logits_path=None):
     import numpy as np
     import torch
     from runtime import check_memory, resource_report
     model.eval()
-    names, labels, predictions = [], [], []
+    names, labels, predictions, view_logits = [], [], [], []
     with torch.inference_mode():
         for step, (images, target, batch_names) in enumerate(loader, 1):
             if step == 1 or step % 50 == 0:
                 check_memory()
-            probs = forward_probabilities(model, images.to(device, non_blocking=True), method, space, crop)
+            result = forward_probabilities(model, images.to(device, non_blocking=True), method, space, crop,
+                                           return_logits=logits_path is not None)
+            if logits_path is not None:
+                probs, logits = result
+                view_logits.append(logits.cpu().numpy())  # K x batch x 9, no feature tensors.
+            else:
+                probs = result
             predictions.append(probs.cpu().numpy())
             labels.append(target.numpy())
             names.extend(batch_names)
@@ -48,6 +55,9 @@ def predict_method(model, loader, device, method="I00", space="prob", crop=None)
                 print(f"{method} inference {step}/{len(loader)} | {resource_report()}", flush=True)
     if not names:
         raise ValueError("Cannot predict an empty loader")
+    if logits_path is not None:
+        raw = np.concatenate(view_logits, axis=1)
+        np.save(logits_path, raw[0] if len(raw) == 1 else raw)
     return names, np.concatenate(labels), np.concatenate(predictions)
 
 

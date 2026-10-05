@@ -74,6 +74,7 @@ def latency_report(model, batch_size: int, img_size: int, dtype: str = "fp32", d
 
 
 def tta_latency(model, k_views: int, **kw) -> dict:
+    """Forward-only K-view microbenchmark; use method_latency for actual TTA/aggregation."""
     import torch
 
     if int(k_views) < 1:

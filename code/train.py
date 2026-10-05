@@ -135,6 +135,7 @@ class EMA:
 def train_one_epoch(model, loader, criterion, optimizer, scheduler, scaler, cfg, device, ema=None):
     import torch
     import losses
+    device = torch.device(device)
     base = _unwrap_model(model)
     model.train()
     if cfg.init == "frozen":
@@ -143,6 +144,8 @@ def train_one_epoch(model, loader, criterion, optimizer, scheduler, scaler, cfg,
     amp = cfg.amp and device.type == "cuda"
     total_loss = torch.zeros((), device=device)
     seen, steps = 0, len(loader)
+    if not steps:
+        raise ValueError("Empty training loader")
     started = time.perf_counter()
     last_log = started
     for step, (images, labels, _) in enumerate(loader, 1):
@@ -191,6 +194,7 @@ def train_one_epoch(model, loader, criterion, optimizer, scheduler, scaler, cfg,
 def evaluate(model, loader, criterion, device, amp=False):
     import numpy as np
     import torch
+    device = torch.device(device)
     model.eval()
     names, ys, outputs = [], [], []
     total_loss = torch.zeros((), device=device)
@@ -216,10 +220,10 @@ def _probabilities(logits):
     return x / x.sum(1, keepdims=True)
 
 
-def _predict_method(model, loader, device, cfg):
+def _predict_method(model, loader, device, cfg, logits_path=None):
     import inference
     return inference.predict_method(model, loader, device, cfg.inference_method,
-                                    cfg.aggregate_space, max(32, cfg.img_size - 32))
+                                    cfg.aggregate_space, max(32, cfg.img_size - 32), logits_path=logits_path)
 
 
 def plot_curves(history, path, title):
@@ -399,7 +403,7 @@ def run(cfg):
     if cfg.inference_method == "I00":
         probs = _probabilities(logits)
     else:
-        names, ys, probs = _predict_method(base, val_loader, device, cfg)
+        names, ys, probs = _predict_method(base, val_loader, device, cfg, folder / "val_view_logits.npy")
     temperature = None
     if cfg.temperature_scale:
         score_logits = np.log(np.clip(probs, 1e-12, 1))
@@ -424,7 +428,7 @@ def run(cfg):
     if cfg.save_test_predictions:
         test_loader = dataset.make_loader(test_df, cfg.images_dir, dataset.build_transforms(False,cfg.img_size),
                                           cfg.batch_size, False, num_workers=0, seed=cfg.seed)
-        names_t, ys_t, probs_t = _predict_method(base, test_loader, device, cfg)
+        names_t, ys_t, probs_t = _predict_method(base, test_loader, device, cfg, folder / "test_logits.npy")
         np.save(folder / "test_log_probs.npy", np.log(np.clip(probs_t,1e-12,1)))
         if temperature is not None:
             ev.save_predictions(Path(cfg.pred_dir)/f"{cfg.exp_id}_uncal_seed{cfg.seed}_test.csv", names_t,ys_t,probs_t)
