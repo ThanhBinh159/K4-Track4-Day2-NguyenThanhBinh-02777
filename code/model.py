@@ -11,10 +11,53 @@ SUGGESTED_BACKBONES = {
     "mobilenetv3": "mobilenetv3_large_100",
 }
 
+_timm_compiler_ready = False
+
+
+def _prepare_torch_for_timm() -> None:
+    """Make the installed torch safe for timm's eager ``torch.compiler`` use.
+
+    ``timm>=1.0.30`` binds ``disable_compiler = torch.compiler.disable`` and decorates
+    functions in ``timm.models.naflexvit`` with it while importing. Calling it runs
+    ``import torch._dynamo``, which reads ``torch._utils``. On torch builds that only
+    lazy-load a fixed submodule allowlist, ``torch._utils`` is not bound yet, so the
+    import fails with ``AttributeError: module 'torch' has no attribute '_utils'``.
+    Bind ``torch._utils`` first and, if ``torch._dynamo`` still cannot load, turn
+    timm's compiler-disable hook into a no-op so ``import timm`` succeeds.
+    """
+    global _timm_compiler_ready
+    if _timm_compiler_ready:
+        return
+
+    import torch
+
+    try:
+        import torch._utils  # noqa: F401  timm's torch._dynamo import needs this
+    except Exception:
+        pass
+    try:
+        import torch._dynamo  # noqa: F401  preload so timm never triggers it mid-import
+        _timm_compiler_ready = True
+        return
+    except Exception:
+        pass
+
+    compiler = getattr(torch, "compiler", None)
+    if compiler is not None:
+        def _identity(fn=None, recursive: bool = True, reason=None):
+            return fn if fn is not None else (lambda wrapped: wrapped)
+
+        try:
+            compiler.disable = _identity
+        except Exception:
+            pass
+    _timm_compiler_ready = True
+
 
 def build_model(name: str, pretrained: bool = True, num_classes: int = 9,
                 drop_rate: float = 0.0, init: str = "finetune"):
     """Create a timm classifier and record the pretrained tag for reproducibility."""
+    _prepare_torch_for_timm()
     import timm
 
     if init not in {"scratch", "frozen", "finetune"}:

@@ -2,7 +2,7 @@
   "source": {
     "runtime.py": "67973befbb3dcb65742ebab6db1177c137cb1f02fb10591d41661edbaf15530d",
     "dataset.py": "85ad26bf6e5b8ce2f5301a72ff49bac2dd8631937b60423f183267c8002b274f",
-    "model.py": "3959d96824cc3a26008ef7bbeda5c8f59eb52a3c746e49bf97bcb0d263fa3c75",
+    "model.py": "763c511679028f86dadd121153a5b8ab0e4829a05d1a8577c4ca0298c7073f6a",
     "losses.py": "110ced89038de0a1e91433ed2b95b4c17dd2b83cdde297ae753b186d48e14ade",
     "benchmark.py": "3d8010f279b45279f3592ecd5d5f6ad424a51fde029e5b3a99a787075ad583b0",
     "inference.py": "7ddb0fcd2773522140a539dc8e94c1c43ab4787e0f521bf69b693dec2244a14e",
@@ -10,8 +10,8 @@
     "runner.py": "e733a68d16e71ee68059707eb419d2e06ca92923bfe792138cdd2ee49b23a5c8",
     "eval.py": "1210f3c7ca1cb9b4488383f1ceeaa139bfdf5c683694b300f6c55b6b9cdde28e"
   },
-  "initial_ce": 2.2113871574401855,
-  "final_ce": 0.00022971915313974023,
+  "initial_ce": 2.212007522583008,
+  "final_ce": 0.00029139401158317924,
   "steps": 120,
   "passed": true
 }
